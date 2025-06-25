@@ -17,4 +17,4 @@ scikit-learn
 catboost
 xgboost
 dill
-#-e .
+#-e .dill==0.4.0
