@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime
 
 print("=== DEBUGGING LOGGER SCRIPT ===")
@@ -17,3 +18,4 @@ with open(LOG_FILE_PATH, "w") as f:
     f.write("Test log file content!\n")
 
 print("Finished writing the log file.")
+logging = logging  # exposes 'logging' for import
