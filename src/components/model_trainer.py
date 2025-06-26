@@ -1,13 +1,12 @@
-print("MODEL TRAINER SCRIPT HAS STARTED")
 import os
-import sys 
+import sys
 from dataclasses import dataclass
 
 from catboost import CatBoostRegressor
 from sklearn.ensemble import (
     AdaBoostRegressor,
     GradientBoostingRegressor,
-    RandomForestRegressor
+    RandomForestRegressor,
 )
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
@@ -16,106 +15,105 @@ from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
 
 from src.exception import CustomException
-from src.logger import logging 
+from src.logger import logging
 
-from src.utils import save_object, evaluate_models
+from src.utils import save_object,evaluate_models
 
 @dataclass
 class ModelTrainerConfig:
-    trained_model_file_path = os.path.join("artifacts", "model.pkl")
+    trained_model_file_path=os.path.join("artifacts","model.pkl")
 
 class ModelTrainer:
     def __init__(self):
-        self.model_trainer_config = ModelTrainerConfig()
+        self.model_trainer_config=ModelTrainerConfig()
 
-    def initiate_model_trainer(self, train_array, test_array):
-        print("Inside initiate_model_trainer...")  # Debug print
+
+    def initiate_model_trainer(self,train_array,test_array):
         try:
             logging.info("Split training and test input data")
-            print("Splitting train and test arrays...")  # Debug print
-            X_train, y_train, X_test, y_test = (
-                train_array[:, :-1],
-                train_array[:, -1],
-                test_array[:, :-1],
-                test_array[:, -1]
+            X_train,y_train,X_test,y_test=(
+                train_array[:,:-1],
+                train_array[:,-1],
+                test_array[:,:-1],
+                test_array[:,-1]
             )
-            print(f"Shapes X_train: {X_train.shape}, y_train: {y_train.shape}")  # Debug print
             models = {
                 "Random Forest": RandomForestRegressor(),
                 "Decision Tree": DecisionTreeRegressor(),
                 "Gradient Boosting": GradientBoostingRegressor(),
                 "Linear Regression": LinearRegression(),
-                "KNeighbors Regressor": KNeighborsRegressor(),
                 "XGBRegressor": XGBRegressor(),
-                "CatBoost Regressor": CatBoostRegressor(verbose=False),
-                "AdaBoost Regressor": AdaBoostRegressor()
+                "CatBoosting Regressor": CatBoostRegressor(verbose=False),
+                "AdaBoost Regressor": AdaBoostRegressor(),
+            }
+            params={
+                "Decision Tree": {
+                    'criterion':['squared_error', 'friedman_mse', 'absolute_error', 'poisson'],
+                    # 'splitter':['best','random'],
+                    # 'max_features':['sqrt','log2'],
+                },
+                "Random Forest":{
+                    # 'criterion':['squared_error', 'friedman_mse', 'absolute_error', 'poisson'],
+                 
+                    # 'max_features':['sqrt','log2',None],
+                    'n_estimators': [8,16,32,64,128,256]
+                },
+                "Gradient Boosting":{
+                    # 'loss':['squared_error', 'huber', 'absolute_error', 'quantile'],
+                    'learning_rate':[.1,.01,.05,.001],
+                    'subsample':[0.6,0.7,0.75,0.8,0.85,0.9],
+                    # 'criterion':['squared_error', 'friedman_mse'],
+                    # 'max_features':['auto','sqrt','log2'],
+                    'n_estimators': [8,16,32,64,128,256]
+                },
+                "Linear Regression":{},
+                "XGBRegressor":{
+                    'learning_rate':[.1,.01,.05,.001],
+                    'n_estimators': [8,16,32,64,128,256]
+                },
+                "CatBoosting Regressor":{
+                    'depth': [6,8,10],
+                    'learning_rate': [0.01, 0.05, 0.1],
+                    'iterations': [30, 50, 100]
+                },
+                "AdaBoost Regressor":{
+                    'learning_rate':[.1,.01,0.5,.001],
+                    # 'loss':['linear','square','exponential'],
+                    'n_estimators': [8,16,32,64,128,256]
+                }
+                
             }
 
-            print("Evaluating models...")  # Debug print
-            model_report: dict = evaluate_models(X_train, y_train, X_test, y_test, models, param={})
-            print("Model report:", model_report)  # Debug print
+            model_report:dict=evaluate_models(X_train=X_train,y_train=y_train,X_test=X_test,y_test=y_test,
+                                             models=models,param=params)
             
-            best_model_score = max(model_report.values())
+            ## To get best model score from dict
+            best_model_score = max(sorted(model_report.values()))
+
+            ## To get best model name from dict
+
             best_model_name = list(model_report.keys())[
                 list(model_report.values()).index(best_model_score)
             ]
             best_model = models[best_model_name]
 
-            if best_model_score < 0.6:
-                print("Best model score below threshold.")  # Debug print
-                raise CustomException('No best model found')
-            
-            logging.info(f"Best found model on both training and testing dataset: {best_model_name} (R2={best_model_score:.4f})")
+            if best_model_score<0.6:
+                raise CustomException("No best model found")
+            logging.info(f"Best found model on both training and testing dataset")
 
-            print(f"Saving model: {best_model_name}")  # Debug print
             save_object(
                 file_path=self.model_trainer_config.trained_model_file_path,
                 obj=best_model
             )
-            predicted = best_model.predict(X_test)
+
+            predicted=best_model.predict(X_test)
 
             r2_square = r2_score(y_test, predicted)
-            print(f"R2 score: {r2_square}")
-            print(f"Model saved at: {self.model_trainer_config.trained_model_file_path}")
             return r2_square
+            
+
+
+
+            
         except Exception as e:
-            print("Exception in initiate_model_trainer:", e)
-            raise CustomException(e, sys)
-
-if __name__ == "__main__":
-    print("model_trainer.py is running...")  # Debug print
-    import pandas as pd
-    import dill
-    import numpy as np
-
-    try:
-        train_df = pd.read_csv("artifacts/train.csv")
-        test_df = pd.read_csv("artifacts/test.csv")
-        print("Dataframes loaded.")  # Debug print
-
-        # Load preprocessor
-        with open("artifacts/preprocessor.pkl", "rb") as f:
-            preprocessor = dill.load(f)
-        print("Preprocessor loaded.")  # Debug print
-
-        target_col = "math_score"
-        X_train = train_df.drop(columns=[target_col])
-        y_train = train_df[target_col]
-        X_test = test_df.drop(columns=[target_col])
-        y_test = test_df[target_col]
-
-        print("Transforming train data...")  # Debug print
-        X_train_processed = preprocessor.transform(X_train)
-        print("Transforming test data...")  # Debug print
-        X_test_processed = preprocessor.transform(X_test)
-
-        train_array = np.c_[X_train_processed, y_train]
-        test_array = np.c_[X_test_processed, y_test]
-
-        print("Calling ModelTrainer...")  # Debug print
-        trainer = ModelTrainer()
-        r2 = trainer.initiate_model_trainer(train_array, test_array)
-        print(f"R2 score: {r2}")
-        print(f"Model saved at: {trainer.model_trainer_config.trained_model_file_path}")
-    except Exception as e:
-        print("Exception during model training:", e)
+            raise CustomException(e,sys)
