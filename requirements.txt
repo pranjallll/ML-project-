@@ -17,4 +17,5 @@ scikit-learn
 catboost
 xgboost
 dill
+Flask
 #-e .dill==0.4.0
